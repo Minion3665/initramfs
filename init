@@ -74,7 +74,7 @@ mount_partitions() {
 
     lvm vgscan --mknodes > /dev/null
 
-    echo "$(stat -Lc %t /dev/mapper/vg1-swap):$(stat -Lc %T /dev/mapper/vg1-swap)" > /sys/power/resume || echo "-- Could not find a pre-existing session, presuming normal boot --"
+    lsblk -o MAJ:MIN -n -f $(cmdline resume) > /sys/power/resume || echo "-- Could not find a pre-existing session, presuming normal boot --"
     mount -t ext4 /dev/mapper/vg1-root /mnt/root
     swapon /dev/mapper/vg1-swap
 }
