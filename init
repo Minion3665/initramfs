@@ -1,0 +1,116 @@
+#!/bin/busybox sh
+
+set -e
+
+rescue_shell() {
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Something went wrong. Dropping to a shell."
+    echo "================================================="
+    set +e
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] The rescue shell is disabled on this      "
+    echo "[IRFS]  system, you're out of luck buddy-. Kernel"
+    echo "[IRFS]  panicking to exit (p.s. I hope you have a"
+    echo "[IRFS]  rescue USB stick or something and know   "
+    echo "[IRFS]  how to get around secure boot)           "
+    echo "================================================="
+    exit 1
+#    exec sh
+}
+
+{
+
+cmdline() {
+    local value
+    value=" $(cat /proc/cmdline) "
+    value="${value##* ${1}=}"
+    value="${value%% *}"
+    [ "${value}" != "" ] && echo "${value}"
+}
+
+setup() {
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Setting up for a boot, wish me luck       "
+    echo "================================================="
+    mount -t proc none /proc
+    mount -t sysfs none /sys
+    mount -t devtmpfs none /dev
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Mounted devices, waiting a few seconds for"
+    echo "[IRFS]  kernel to detect devices before booting  "
+    echo "================================================="
+    echo "-- 3 --"
+    sleep 1
+    echo "-- 2 --"
+    sleep 1
+    echo "-- 1 --"
+    sleep 1
+    echo "-- 0 -- Resuming boot --"
+}
+
+mount_partitions() {
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Unlocking LUKS for mounting               "
+    echo "================================================="
+    lvm vgscan --mknodes > /dev/null
+
+    cryptsetup --tries 5 luksOpen /luks/key.luks lukskey || rescue_shell
+    echo "-- Correct password -- Unlocking root partition --"
+    cryptsetup --key-file /dev/mapper/lukskey luksOpen $(findfs UUID=be9e6a97-68ea-4362-976a-103eeffd9b14) gentoo || rescue_shell
+    cryptsetup close lukskey
+
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Mounting LVM partitions                   "
+    echo "[IRFS] (home can be mounted by my successor)     "
+    echo "================================================="
+    lvm vgchange --available y > /dev/null
+    lvm lvchange -a ly vg1/root > /dev/null
+
+    lvm vgscan --mknodes > /dev/null
+
+    echo "$(stat -Lc %t /dev/mapper/vg1-swap):$(stat -Lc %T /dev/mapper/vg1-swap)" > /sys/power/resume || echo "-- Could not find a pre-existing session, presuming normal boot --"
+    mount -t ext4 /dev/mapper/vg1-root /mnt/root
+    swapon /dev/mapper/vg1-swap
+}
+
+cleanup() {
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] Cleaning up... prepare for a boot         "
+    echo "================================================="
+    umount proc
+    umount sys
+    umount dev
+    clear
+    echo "================================================="
+    echo "It is currently $(date)"
+    echo "================================================="
+    echo "[IRFS] INITRAMFS - 3665 Custom made - 18-Feb-2021"
+    echo "[IRFS] This initramfs script has now completed   "
+    echo "[IRFS] Deferring to the main init script for the "
+    echo "[IRFS]  rest of the boot. Please stand by...     "
+    echo "================================================="
+}
+
+do_init() {
+    setup
+    mount_partitions
+    cleanup
+    exec switch_root /mnt/root /sbin/init
+}
+
+do_init
+
+} || {
+
+rescue_shell
+
+}
+
+
